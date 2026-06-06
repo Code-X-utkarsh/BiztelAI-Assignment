@@ -15,6 +15,7 @@ env/
 dist/
 build/
 .pytest_cache/
+.env.production
 
 # Node/Frontend
 node_modules/
