@@ -162,7 +162,13 @@ MAX_FILE_SIZE_MB — max upload size (default: 10)
 - AGENTS.md documentation polish
 
 ## Deployment Architecture
-- **Backend**: Containerized with Docker, deployed to Google Cloud Run (Serverless).
+**Live URLs:**
+- **Frontend**: https://biztelai-frontend.web.app
+- **Backend API**: https://biztelai-backend-bqmz.onrender.com
+- **API Docs**: https://biztelai-backend-bqmz.onrender.com/docs
+- **GitHub**: https://github.com/Code-X-utkarsh/BiztelAI-Assignment
+
+- **Backend**: Containerized with Docker, deployed to Google Cloud Run (Serverless) / Render.
 - **Frontend**: Built with Vite, deployed to Firebase Hosting (SPA configuration).
 - **CI/CD**: Fully automated pipelines using GitHub Actions triggered on push to `main`.
 - **Local Dev**: Configured with `docker-compose up --build` for parity with production.

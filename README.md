@@ -1,5 +1,16 @@
 # BiztelAI DocFlow
 
+## 🚀 Live Demo
+| | URL |
+|---|---|
+| Frontend | https://biztelai-frontend.web.app |
+| Backend API | https://biztelai-backend-bqmz.onrender.com |
+| API Docs (Swagger) | https://biztelai-backend-bqmz.onrender.com/docs |
+| GitHub | https://github.com/Code-X-utkarsh/BiztelAI-Assignment |
+
+> Note: Backend is on Render free tier. 
+> First request after inactivity may take ~50 seconds to wake up.
+
 ## What It Does
 BiztelAI DocFlow is an AI-powered manufacturing document digitization system. It allows factory workers to upload scanned handwritten production logs, automatically extracts critical data fields using Google's Gemini Vision AI, and provides a sleek interface to review, approve, and analyze the digitized records.
 

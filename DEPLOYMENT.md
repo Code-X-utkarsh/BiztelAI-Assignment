@@ -1,5 +1,10 @@
 # BiztelAI DocFlow - Deployment Guide
 
+## Live URLs
+- **Frontend**: https://biztelai-frontend.web.app
+- **Backend API**: https://biztelai-backend-bqmz.onrender.com
+- **API Docs**: https://biztelai-backend-bqmz.onrender.com/docs
+- **GitHub**: https://github.com/Code-X-utkarsh/BiztelAI-Assignment
 This guide covers setting up Google Cloud Platform (GCP) for the backend and Firebase Hosting for the frontend.
 
 ## Section 1 — One-time GCP Setup
