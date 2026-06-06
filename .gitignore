@@ -1,0 +1,37 @@
+# Python/Backend
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+!.env.example
+biztelai.db
+backend/uploads/*
+!backend/uploads/.gitkeep
+.venv/
+venv/
+env/
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+
+# Node/Frontend
+node_modules/
+frontend/dist/
+frontend/.firebase/
+.npm/
+
+# IDE/OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+*.log
+
+# Docker
+*.env.local
+
+# Firebase
+.firebase/
+firebase-debug.log
