@@ -213,9 +213,9 @@ export default function ReviewPage() {
           <h2 className="text-white/80 font-semibold text-sm uppercase tracking-widest mb-4">Document Preview</h2>
           <div className="flex-1 bg-white/5 border border-white/10 rounded-lg overflow-hidden flex items-center justify-center mb-5">
             {upload.file_type === "pdf" ? (
-              <iframe src={`/uploads/${upload.file_path.split(/[/\\]/).pop()}`} className="w-full h-full border-none bg-white" title="PDF Preview" />
+              <iframe src={`${import.meta.env.VITE_BACKEND_URL || ""}/uploads/${upload.file_path.split(/[/\\]/).pop()}`} className="w-full h-full border-none bg-white" title="PDF Preview" />
             ) : (
-              <img src={`/uploads/${upload.file_path.split(/[/\\]/).pop()}`} alt="preview" className="max-w-full max-h-full object-contain" />
+              <img src={`${import.meta.env.VITE_BACKEND_URL || ""}/uploads/${upload.file_path.split(/[/\\]/).pop()}`} alt="preview" className="max-w-full max-h-full object-contain" />
             )}
           </div>
           
