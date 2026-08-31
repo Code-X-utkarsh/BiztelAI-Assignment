@@ -26,6 +26,7 @@ upload_dir = os.getenv("UPLOAD_DIR", "uploads")
 os.makedirs(upload_dir, exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=upload_dir), name="uploads")
 
+app.include_router(uploads.debug_router, prefix="/api", tags=["debug"])
 app.include_router(uploads.router, prefix="/api/uploads", tags=["uploads"])
 app.include_router(records.router, prefix="/api/records", tags=["records"])
 app.include_router(analytics.router, prefix="/api/analytics", tags=["analytics"])
@@ -33,4 +34,7 @@ app.include_router(analytics.router, prefix="/api/analytics", tags=["analytics"]
 
 @app.on_event("startup")
 def on_startup():
+    target_upload_dir = os.getenv("UPLOAD_DIR", "uploads")
+    os.makedirs(target_upload_dir, exist_ok=True)
     Base.metadata.create_all(bind=engine)
+
