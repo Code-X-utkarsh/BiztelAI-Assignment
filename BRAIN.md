@@ -6,8 +6,9 @@ BiztelAI DocFlow is an AI-powered document digitization system tailored for manu
 ## Tech Stack
 Backend: FastAPI, SQLAlchemy, SQLite (biztelai.db), Uvicorn
 Frontend: React 18, Vite, Tailwind CSS v3, React Router v6, Axios, Lucide React, Recharts
-AI: Google Gemini Vision API (model: gemini-1.5-flash)
+AI: Google Gemini Vision API (model: gemini-2.5-flash-lite)
 Deployment: TBD
+
 
 ## Folder Structure
 ```

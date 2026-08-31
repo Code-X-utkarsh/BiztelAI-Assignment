@@ -107,11 +107,12 @@ export default function ReviewPage() {
       };
     }
     return {
-      name: "Gemini 1.5 Flash",
+      name: "Gemini 2.5 Flash Lite",
       chipClass: "bg-sky-500/15 text-sky-300 border-sky-500/30 shadow-[0_0_8px_rgba(14,165,233,0.2)]",
       dotClass: "bg-sky-400",
     };
   };
+
 
   const fetchData = async () => {
 
