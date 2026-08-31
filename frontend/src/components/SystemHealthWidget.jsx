@@ -68,8 +68,9 @@ export default function SystemHealthWidget() {
       style={{
         background: "rgba(15, 23, 42, 0.65)",
         backdropFilter: "blur(12px)",
-        maxHeight: "180px",
+        maxHeight: "195px",
         boxShadow: `0 0 16px ${glowColor}`,
+
         transition: "box-shadow 0.4s ease, border-color 0.4s ease",
       }}
     >
@@ -196,7 +197,7 @@ export default function SystemHealthWidget() {
       </div>
 
       {/* Status Text Below Monitor */}
-      <div className="text-center my-0.5">
+      <div className="text-center my-0.5 flex flex-col items-center gap-1">
         <span
           className={`text-[11px] font-semibold tracking-wide ${
             loading
@@ -208,7 +209,17 @@ export default function SystemHealthWidget() {
         >
           {statusText}
         </span>
+        {health?.active_provider === "auto" ? (
+          <span className="text-[9px] px-2 py-0.5 rounded-full bg-indigo-500/20 border border-indigo-500/35 text-indigo-300 font-semibold tracking-wide shadow-[0_0_8px_rgba(99,102,241,0.2)]">
+            Mode: Auto (Best of 2)
+          </span>
+        ) : health?.active_provider ? (
+          <span className="text-[9px] px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-white/60 font-medium tracking-wide capitalize">
+            Mode: {health.active_provider}
+          </span>
+        ) : null}
       </div>
+
 
       {/* Service Status Indicator Dots */}
       <div className="flex items-center justify-between text-[10px] text-white/50 px-1 pt-1.5 border-t border-white/5 mt-1">

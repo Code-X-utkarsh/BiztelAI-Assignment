@@ -288,6 +288,78 @@ async def run_single_provider(provider_name: str, file_path: str, file_type: str
 async def extract_from_document(file_path: str, file_type: str) -> dict:
     env_provider = os.getenv("AI_PROVIDER", "gemini").lower().strip()
     
+    if env_provider == "auto":
+        print(f"\n==================================================")
+        print(f"[EXTRACTION] Starting document extraction pipeline (AUTO MODE)")
+        print(f"[EXTRACTION] file_path: '{file_path}' (exists on disk: {os.path.exists(file_path)})")
+        print(f"[EXTRACTION] file_type: '{file_type}'")
+        print(f"[EXTRACTION] AI_PROVIDER configured: 'auto'")
+        print(f"[AUTO] Running both providers concurrently")
+        print(f"==================================================")
+
+        gemini_task = run_single_provider("gemini", file_path, file_type)
+        nvidia_task = run_single_provider("nvidia", file_path, file_type)
+
+        gemini_res, nvidia_res = await asyncio.gather(
+            gemini_task,
+            nvidia_task,
+            return_exceptions=True
+        )
+
+        gemini_valid = (
+            not isinstance(gemini_res, Exception)
+            and isinstance(gemini_res, dict)
+            and is_valid_extraction_result(gemini_res)
+        )
+        nvidia_valid = (
+            not isinstance(nvidia_res, Exception)
+            and isinstance(nvidia_res, dict)
+            and is_valid_extraction_result(nvidia_res)
+        )
+
+        print(f"[AUTO] Gemini result: {'valid' if gemini_valid else 'invalid'}")
+        if isinstance(gemini_res, Exception):
+            print(f"[AUTO] Gemini error: {gemini_res}")
+
+        print(f"[AUTO] NVIDIA result: {'valid' if nvidia_valid else 'invalid'}")
+        if isinstance(nvidia_res, Exception):
+            print(f"[AUTO] NVIDIA error: {nvidia_res}")
+
+        if gemini_valid and nvidia_valid:
+            print("[AUTO] Selected provider: gemini")
+            gemini_res["provider_used"] = "gemini"
+            print(f"[EXTRACTION] Final parsed result before returning:\n{json.dumps(gemini_res, indent=2)}")
+            return gemini_res
+        elif gemini_valid:
+            print("[AUTO] Selected provider: gemini")
+            gemini_res["provider_used"] = "gemini"
+            print(f"[EXTRACTION] Final parsed result before returning:\n{json.dumps(gemini_res, indent=2)}")
+            return gemini_res
+        elif nvidia_valid:
+            print("[AUTO] Selected provider: nvidia")
+            nvidia_res["provider_used"] = "nvidia"
+            print(f"[EXTRACTION] Final parsed result before returning:\n{json.dumps(nvidia_res, indent=2)}")
+            return nvidia_res
+        else:
+            print("[AUTO] Both providers failed")
+            error_summary = f"Both providers failed in AUTO mode. Gemini: {gemini_res}. NVIDIA: {nvidia_res}"
+            return {
+                "fields": {k: None for k in [
+                    "date", "shift", "employee_number", "operation_code",
+                    "machine_number", "work_order_number", 
+                    "quantity_produced", "time_taken"
+                ]},
+                "confidence_scores": {k: 0.0 for k in [
+                    "date", "shift", "employee_number", "operation_code",
+                    "machine_number", "work_order_number",
+                    "quantity_produced", "time_taken"
+                ]},
+                "overall_confidence": 0.0,
+                "extraction_notes": error_summary,
+                "raw_response": error_summary,
+                "provider_used": None
+            }
+
     if env_provider == "nvidia":
         primary = "nvidia"
         fallback = "gemini"
@@ -302,6 +374,7 @@ async def extract_from_document(file_path: str, file_type: str) -> dict:
     print(f"[EXTRACTION] AI_PROVIDER configured: '{env_provider}'")
     print(f"[EXTRACTION] Execution plan: Primary={primary}, Fallback={fallback}")
     print(f"==================================================")
+
 
     # 1. Try Primary Provider
     primary_reason = ""
