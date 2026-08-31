@@ -325,8 +325,12 @@ export default function ReviewPage() {
             </div>
           )}
 
-          {/* 2. Processed by Badge when extraction is complete */}
-          {!(upload.status === "extracting" || isExtracting) && (upload.status === "review_pending" || upload.status === "approved" || upload.status === "reviewed" || record?.provider_used) && (
+          {/* 2. Processed by Badge when extraction is complete and provider succeeded */}
+          {!(upload.status === "extracting" || isExtracting) && (upload.status === "review_pending" || upload.status === "approved" || upload.status === "reviewed") && (record?.provider_used || (() => {
+            try {
+              return JSON.parse(record?.raw_extraction || "{}")?.provider_used;
+            } catch(e) { return null; }
+          })()) && (
             <div className="rounded-xl p-3 mb-5 border border-emerald-500/25 bg-emerald-500/10 flex items-center justify-between shadow-[0_0_12px_rgba(16,185,129,0.1)] shrink-0">
               <div className="flex items-center gap-2.5">
                 <div className="w-7 h-7 rounded-lg bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.25)]">
@@ -342,6 +346,28 @@ export default function ReviewPage() {
               <CheckCircle size={16} className="text-emerald-400 shrink-0" />
             </div>
           )}
+
+          {/* 3. Extraction failed badge if complete but no provider succeeded */}
+          {!(upload.status === "extracting" || isExtracting) && (upload.status === "review_pending" || upload.status === "failed") && !record?.provider_used && !(() => {
+            try {
+              return JSON.parse(record?.raw_extraction || "{}")?.provider_used;
+            } catch(e) { return null; }
+          })() && (
+            <div className="rounded-xl p-3 mb-5 border border-red-500/25 bg-red-500/10 flex items-center justify-between shadow-[0_0_12px_rgba(239,68,68,0.1)] shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="w-7 h-7 rounded-lg bg-red-500/20 border border-red-500/40 flex items-center justify-center text-red-400">
+                  <AlertCircle size={16} />
+                </div>
+                <div>
+                  <div className="text-[10px] uppercase font-semibold text-red-400/80 tracking-wider">Extraction Failed</div>
+                  <div className="text-xs font-medium text-white">
+                    No fields extracted. Check API keys.
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           
           <button 
             onClick={reExtract} 
