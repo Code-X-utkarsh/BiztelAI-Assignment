@@ -41,7 +41,9 @@ class ExtractedRecord(Base):
     validation_errors = Column(Text, nullable=True)
     review_status = Column(String, default="pending", nullable=False)
     reviewer_notes = Column(String, nullable=True)
+    provider_used = Column(String, nullable=True)  # "gemini", "nvidia", or None
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     upload = relationship("UploadRecord", back_populates="records")
+

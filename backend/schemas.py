@@ -21,11 +21,14 @@ class ExtractedRecordOut(BaseModel):
     validation_errors: Optional[Any]
     review_status: str
     reviewer_notes: Optional[str]
+    provider_used: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 
     class Config:
+        from_attributes = True
         orm_mode = True
+
 
 
 class UploadRecordOut(BaseModel):
@@ -38,7 +41,9 @@ class UploadRecordOut(BaseModel):
     records: list[ExtractedRecordOut] = []
 
     class Config:
+        from_attributes = True
         orm_mode = True
+
 
 
 class ExtractedRecordUpdate(BaseModel):
@@ -110,11 +115,13 @@ class ExtractedRecordWithFilename(BaseModel):
     confidence_scores: Optional[str]
     validation_errors: Optional[str]
     review_status: str
+    provider_used: Optional[str] = None
     created_at: datetime
     updated_at: Optional[datetime]
 
     class Config:
         from_attributes = True
+
 
 class PaginatedRecordsResponse(BaseModel):
     items: List[ExtractedRecordWithFilename]

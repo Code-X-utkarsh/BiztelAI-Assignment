@@ -1,7 +1,8 @@
 import React, { useEffect, useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import axios from "../api/axios.js";
-import { ArrowLeft, RefreshCw, CheckCircle, AlertCircle } from "lucide-react";
+import { ArrowLeft, RefreshCw, CheckCircle, AlertCircle, Bot } from "lucide-react";
+
 
 const FieldRow = ({ label, name, value, onChange, score, error }) => {
   let badgeColor = "bg-white/5 text-white/40";
@@ -68,10 +69,52 @@ export default function ReviewPage() {
   const [isExtracting, setIsExtracting] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [extractionStatus, setExtractionStatus] = useState("idle");
+  const [activeProvider, setActiveProvider] = useState("gemini");
 
   const pollInterval = useRef(null);
 
+  // Fetch active provider on page load
+  useEffect(() => {
+    const fetchEnv = async () => {
+      try {
+        const resp = await axios.get("/debug/env");
+        const prov = resp.data?.active_provider || resp.data?.primary_provider || "gemini";
+        setActiveProvider(prov);
+      } catch (e) {
+        console.warn("Failed to fetch debug env:", e);
+      }
+    };
+    fetchEnv();
+  }, []);
+
+  const getModelInfo = (provider) => {
+    let p = provider;
+    if (!p && record?.provider_used) p = record.provider_used;
+    if (!p && record?.raw_extraction) {
+      try {
+        const raw = JSON.parse(record.raw_extraction);
+        if (raw?.provider_used) p = raw.provider_used;
+      } catch (e) {}
+    }
+    if (!p) p = activeProvider || "gemini";
+    p = String(p).toLowerCase();
+
+    if (p.includes("nvidia") || p.includes("llama")) {
+      return {
+        name: "Llama 3.2 Vision 90B",
+        chipClass: "bg-[#76b900]/15 text-[#86d900] border-[#76b900]/30 shadow-[0_0_8px_rgba(118,185,0,0.2)]",
+        dotClass: "bg-[#76b900]",
+      };
+    }
+    return {
+      name: "Gemini 1.5 Flash",
+      chipClass: "bg-sky-500/15 text-sky-300 border-sky-500/30 shadow-[0_0_8px_rgba(14,165,233,0.2)]",
+      dotClass: "bg-sky-400",
+    };
+  };
+
   const fetchData = async () => {
+
     try {
       const resp = await axios.get(`/uploads/${uploadId}`);
       const data = resp.data;
@@ -239,6 +282,66 @@ export default function ReviewPage() {
               </span>
             </div>
           </div>
+
+          <style>{`
+            @keyframes borderPulse {
+              0%, 100% { border-color: rgba(99, 102, 241, 0.3); box-shadow: 0 0 14px rgba(99, 102, 241, 0.15); }
+              50% { border-color: rgba(99, 102, 241, 0.7); box-shadow: 0 0 24px rgba(99, 102, 241, 0.35); }
+            }
+            @keyframes indeterminateProgress {
+              0% { left: -35%; }
+              50% { left: 40%; }
+              100% { left: 105%; }
+            }
+          `}</style>
+
+          {/* 1. Animated Extraction Status Box during extracting */}
+          {(upload.status === "extracting" || isExtracting) && (
+            <div
+              className="rounded-xl p-4 mb-5 border border-indigo-500/40 bg-slate-900/90 transition-all duration-300 relative overflow-hidden shrink-0"
+              style={{ animation: "borderPulse 2.4s infinite ease-in-out" }}
+            >
+              <div className="flex items-center gap-2.5 text-white font-medium text-sm mb-2.5">
+                <RefreshCw size={16} className="animate-spin text-indigo-400 shrink-0" />
+                <span>AI is scanning your document...</span>
+              </div>
+              
+              <div className="flex items-center justify-between gap-2 mb-2">
+                <span className="text-white/50 text-xs">Active Engine:</span>
+                <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold border ${getModelInfo(activeProvider).chipClass}`}>
+                  <span className={`w-1.5 h-1.5 rounded-full animate-ping ${getModelInfo(activeProvider).dotClass}`} />
+                  {getModelInfo(activeProvider).name}
+                </span>
+              </div>
+
+              <p className="text-white/40 text-xs mb-3">This may take 10–30 seconds</p>
+
+              <div className="w-full bg-white/10 rounded-full h-1.5 overflow-hidden relative">
+                <div
+                  className="absolute top-0 bottom-0 w-1/3 rounded-full bg-gradient-to-r from-indigo-500 via-sky-400 to-emerald-400"
+                  style={{ animation: "indeterminateProgress 1.6s cubic-bezier(0.4, 0, 0.2, 1) infinite" }}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* 2. Processed by Badge when extraction is complete */}
+          {!(upload.status === "extracting" || isExtracting) && (upload.status === "review_pending" || upload.status === "approved" || upload.status === "reviewed" || record?.provider_used) && (
+            <div className="rounded-xl p-3 mb-5 border border-emerald-500/25 bg-emerald-500/10 flex items-center justify-between shadow-[0_0_12px_rgba(16,185,129,0.1)] shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="w-7 h-7 rounded-lg bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.25)]">
+                  <Bot size={16} />
+                </div>
+                <div>
+                  <div className="text-[10px] uppercase font-semibold text-emerald-400/80 tracking-wider">Processed By</div>
+                  <div className="text-xs font-medium text-white">
+                    Extracted by {getModelInfo(record?.provider_used).name}
+                  </div>
+                </div>
+              </div>
+              <CheckCircle size={16} className="text-emerald-400 shrink-0" />
+            </div>
+          )}
           
           <button 
             onClick={reExtract} 
@@ -248,6 +351,7 @@ export default function ReviewPage() {
             {(isExtracting || extractionStatus === "extracting") ? <div className="spinner-sm" /> : <RefreshCw size={18} />}
             Re-extract Document
           </button>
+
         </div>
 
         {/* RIGHT COLUMN: 60% */}

@@ -78,10 +78,12 @@ async def run_extraction(upload_id: int, db: Session):
             if hasattr(extracted_record, field):
                 setattr(extracted_record, field, value)
                 
+        extracted_record.provider_used = result.get("provider_used")
         extracted_record.confidence_scores = json.dumps(result["confidence_scores"])
         extracted_record.raw_extraction = json.dumps(result)
         extracted_record.validation_errors = json.dumps(errors)
         extracted_record.review_status = "pending"
+
         
         upload.status = "review_pending"
         db.commit()
