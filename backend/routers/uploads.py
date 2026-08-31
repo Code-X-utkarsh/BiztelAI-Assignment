@@ -117,7 +117,7 @@ def get_debug_env_data():
     upload_dir = os.getenv("UPLOAD_DIR", "uploads")
     dir_exists = os.path.exists(upload_dir)
     files = os.listdir(upload_dir) if dir_exists else []
-    ai_provider = os.getenv("AI_PROVIDER", "gemini")
+    ai_provider = (os.getenv("AI_PROVIDER") or "gemini").lower().strip()
     gemini_key_present = bool((os.getenv("GEMINI_API_KEY") or "").strip())
     nvidia_key_present = bool((os.getenv("NVIDIA_API_KEY") or "").strip())
     system_ok = gemini_key_present or nvidia_key_present

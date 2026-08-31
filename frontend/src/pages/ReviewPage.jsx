@@ -302,20 +302,32 @@ export default function ReviewPage() {
               className="rounded-xl p-4 mb-5 border border-indigo-500/40 bg-slate-900/90 transition-all duration-300 relative overflow-hidden shrink-0"
               style={{ animation: "borderPulse 2.4s infinite ease-in-out" }}
             >
-              <div className="flex items-center gap-2.5 text-white font-medium text-sm mb-2.5">
-                <RefreshCw size={16} className="animate-spin text-indigo-400 shrink-0" />
-                <span>AI is scanning your document...</span>
-              </div>
-              
-              <div className="flex items-center justify-between gap-2 mb-2">
-                <span className="text-white/50 text-xs">Active Engine:</span>
-                <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold border ${getModelInfo(activeProvider).chipClass}`}>
-                  <span className={`w-1.5 h-1.5 rounded-full animate-ping ${getModelInfo(activeProvider).dotClass}`} />
-                  {getModelInfo(activeProvider).name}
-                </span>
-              </div>
+              {activeProvider === "auto" ? (
+                <>
+                  <div className="flex items-center gap-2.5 text-white font-medium text-sm mb-2.5">
+                    <RefreshCw size={16} className="animate-spin text-indigo-400 shrink-0" />
+                    <span>Running AI Analysis...</span>
+                  </div>
+                  <p className="text-white/60 text-xs mb-3">Trying both Gemini &amp; NVIDIA</p>
+                </>
+              ) : (
+                <>
+                  <div className="flex items-center gap-2.5 text-white font-medium text-sm mb-2.5">
+                    <RefreshCw size={16} className="animate-spin text-indigo-400 shrink-0" />
+                    <span>AI is scanning your document...</span>
+                  </div>
+                  
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <span className="text-white/50 text-xs">Active Engine:</span>
+                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold border ${getModelInfo(activeProvider).chipClass}`}>
+                      <span className={`w-1.5 h-1.5 rounded-full animate-ping ${getModelInfo(activeProvider).dotClass}`} />
+                      {getModelInfo(activeProvider).name}
+                    </span>
+                  </div>
 
-              <p className="text-white/40 text-xs mb-3">This may take 10–30 seconds</p>
+                  <p className="text-white/40 text-xs mb-3">This may take 10–30 seconds</p>
+                </>
+              )}
 
               <div className="w-full bg-white/10 rounded-full h-1.5 overflow-hidden relative">
                 <div
@@ -325,6 +337,7 @@ export default function ReviewPage() {
               </div>
             </div>
           )}
+
 
           {/* 2. Processed by Badge when extraction is complete and provider succeeded */}
           {!(upload.status === "extracting" || isExtracting) && (upload.status === "review_pending" || upload.status === "approved" || upload.status === "reviewed") && (record?.provider_used || (() => {
