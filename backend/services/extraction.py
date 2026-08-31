@@ -243,93 +243,119 @@ async def extract_with_nvidia(file_path: str, file_type: str) -> dict:
         raise json.JSONDecodeError(f"Failed to parse: {str(e)}", raw_text, 0)
 
 
+def count_non_null_fields(result: dict) -> int:
+    """Count non-null, non-empty extracted fields."""
+    if not isinstance(result, dict):
+        return 0
+    fields = result.get("fields")
+    if not isinstance(fields, dict):
+        return 0
+    return sum(
+        1 for v in fields.values() 
+        if v is not None and str(v).strip() != "" and str(v).strip().lower() != "null" and str(v).strip().lower() != "none"
+    )
+
+def is_valid_extraction_result(result: dict) -> bool:
+    """Check if extraction result is non-empty and has at least one non-null extracted field."""
+    return count_non_null_fields(result) > 0
+
 async def run_single_provider(provider_name: str, file_path: str, file_type: str) -> dict:
     """Call a single provider after verifying API key and requirements."""
     if provider_name == "gemini":
         gemini_key = (os.getenv("GEMINI_API_KEY") or "").strip()
-        if not gemini_key:
+        if not gemini_key or gemini_key == "your_gemini_api_key_here":
             raise ValueError("GEMINI_API_KEY is not set or empty")
-        return await extract_with_gemini(file_path, file_type)
+        res = await extract_with_gemini(file_path, file_type)
+        if not is_valid_extraction_result(res):
+            raise ValueError("Gemini returned an invalid or empty result (all fields null)")
+        return res
         
     elif provider_name == "nvidia":
         nvidia_key = (os.getenv("NVIDIA_API_KEY") or "").strip()
-        if not nvidia_key:
+        if not nvidia_key or nvidia_key == "your_nvidia_api_key_here":
             raise ValueError("NVIDIA_API_KEY is not set or empty")
         if file_type == "pdf":
             raise ValueError("NVIDIA Vision API does not support PDFs (images only)")
-        return await extract_with_nvidia(file_path, file_type)
+        res = await extract_with_nvidia(file_path, file_type)
+        if not is_valid_extraction_result(res):
+            raise ValueError("NVIDIA returned an invalid or empty result (all fields null)")
+        return res
         
     else:
         raise ValueError(f"Unknown AI provider: {provider_name}")
-
-def is_valid_extraction_result(result: dict) -> bool:
-    """Check if extraction result is non-empty and has at least one non-null extracted field."""
-    if not isinstance(result, dict):
-        return False
-    fields = result.get("fields")
-    if not isinstance(fields, dict) or not fields:
-        return False
-    # Check if there is at least one non-null, non-empty extracted value
-    has_any_value = any(v is not None and str(v).strip() != "" for v in fields.values())
-    return has_any_value
 
 async def extract_from_document(file_path: str, file_type: str) -> dict:
     env_provider = os.getenv("AI_PROVIDER", "gemini").lower().strip()
     
     if env_provider == "nvidia":
         primary = "nvidia"
-        secondary = "gemini"
+        fallback = "gemini"
     else:
         primary = "gemini"
-        secondary = "nvidia"
+        fallback = "nvidia"
 
     print(f"\n==================================================")
     print(f"[EXTRACTION] Starting document extraction pipeline")
     print(f"[EXTRACTION] file_path: '{file_path}' (exists on disk: {os.path.exists(file_path)})")
     print(f"[EXTRACTION] file_type: '{file_type}'")
     print(f"[EXTRACTION] AI_PROVIDER configured: '{env_provider}'")
-    print(f"[EXTRACTION] Execution plan: Primary={primary}, Fallback={secondary}")
+    print(f"[EXTRACTION] Execution plan: Primary={primary}, Fallback={fallback}")
     print(f"==================================================")
 
     # 1. Try Primary Provider
     primary_reason = ""
     print(f"Trying primary provider: {primary}")
     try:
-        result = await run_single_provider(primary, file_path, file_type)
-        if is_valid_extraction_result(result):
-            result["provider_used"] = primary
+        primary_result = await run_single_provider(primary, file_path, file_type)
+        non_null_count = count_non_null_fields(primary_result)
+        is_valid = is_valid_extraction_result(primary_result)
+        print(f"Primary result valid: {is_valid}")
+        print(f"Fields returned: {non_null_count} non-null fields")
+
+        if is_valid:
+            primary_result["provider_used"] = primary
             print(f"Primary provider: {primary} succeeded")
-            print(f"[EXTRACTION] Final parsed result before returning:\n{json.dumps(result, indent=2)}")
-            return result
+            print(f"[EXTRACTION] Final parsed result before returning:\n{json.dumps(primary_result, indent=2)}")
+            return primary_result
         else:
-            primary_reason = "All extracted fields are None or empty"
+            primary_reason = f"{primary} returned invalid result (0 non-null fields)"
+            print(f"Primary {primary} returned invalid result")
             print(f"Primary provider failed: {primary_reason}. Trying fallback...")
     except Exception as e:
         primary_reason = str(e)
+        print(f"Primary {primary} returned invalid result: {primary_reason}")
         print(f"Primary provider failed: {primary_reason}. Trying fallback...")
         traceback.print_exc()
 
     # 2. Try Fallback Provider
     secondary_reason = ""
-    print(f"Trying fallback provider: {secondary}")
+    print(f"Attempting fallback to {fallback}")
+    print(f"Trying fallback provider: {fallback}")
     try:
-        result = await run_single_provider(secondary, file_path, file_type)
-        if is_valid_extraction_result(result):
-            result["provider_used"] = secondary
-            print(f"Fallback provider: {secondary} succeeded")
-            print(f"[EXTRACTION] Final parsed result before returning:\n{json.dumps(result, indent=2)}")
-            return result
+        fallback_result = await run_single_provider(fallback, file_path, file_type)
+        fallback_non_null = count_non_null_fields(fallback_result)
+        fallback_valid = is_valid_extraction_result(fallback_result)
+        print(f"Fallback {fallback} result valid: {fallback_valid}")
+        print(f"Fields returned: {fallback_non_null} non-null fields")
+
+        if fallback_valid:
+            fallback_result["provider_used"] = fallback
+            print(f"Fallback provider: {fallback} succeeded")
+            print(f"[EXTRACTION] Final parsed result before returning:\n{json.dumps(fallback_result, indent=2)}")
+            return fallback_result
         else:
-            secondary_reason = "All extracted fields are None or empty"
+            secondary_reason = f"{fallback} returned invalid result (0 non-null fields)"
+            print(f"Fallback {fallback} result valid: False")
             print(f"Fallback provider failed: {secondary_reason}")
     except Exception as e:
         secondary_reason = str(e)
+        print(f"Fallback {fallback} result valid: False")
         print(f"Fallback provider failed: {secondary_reason}")
         traceback.print_exc()
 
     # 3. Both Providers Failed
     print("Both providers failed")
-    error_summary = f"Both providers failed. Primary ({primary}): {primary_reason}. Fallback ({secondary}): {secondary_reason}"
+    error_summary = f"Both providers failed. Primary ({primary}): {primary_reason}. Fallback ({fallback}): {secondary_reason}"
     return {
         "fields": {k: None for k in [
             "date", "shift", "employee_number", "operation_code",
@@ -346,5 +372,6 @@ async def extract_from_document(file_path: str, file_type: str) -> dict:
         "raw_response": error_summary,
         "provider_used": None
     }
+
 
 
