@@ -1,6 +1,7 @@
 import json
 import os
 import base64
+import traceback
 from pathlib import Path
 from dotenv import load_dotenv
 import requests
@@ -65,69 +66,121 @@ def encode_image_to_base64(file_path: str) -> str:
         return base64.standard_b64encode(f.read()).decode("utf-8")
 
 async def extract_with_gemini(file_path: str, file_type: str) -> dict:
+    gemini_key = os.getenv("GEMINI_API_KEY")
+    print(f"[GEMINI] Starting Gemini extraction for '{file_path}' (type: '{file_type}')")
+    print(f"[GEMINI] GEMINI_API_KEY configured: {bool(gemini_key)}")
+    if not gemini_key:
+        raise ValueError("GEMINI_API_KEY environment variable is not set or empty!")
+
     import google.generativeai as genai
-    genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+    genai.configure(api_key=gemini_key)
     model = genai.GenerativeModel("gemini-1.5-flash")
     
+    content_payload = [EXTRACTION_PROMPT]
+
     if file_type == "image":
-        # Read image file
-        with open(file_path, "rb") as f:
-            image_data = f.read()
-        
-        # Determine mime type
-        ext = Path(file_path).suffix.lower()
-        mime_map = {".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png"}
-        mime_type = mime_map.get(ext, "image/jpeg")
-        
-        image_part = {
-            "mime_type": mime_type,
-            "data": base64.standard_b64encode(image_data).decode("utf-8")
-        }
-        
-        response = model.generate_content([EXTRACTION_PROMPT, image_part])
+        print(f"[GEMINI] Loading image with Pillow from '{file_path}'...")
+        try:
+            import PIL.Image
+            img = PIL.Image.open(file_path)
+            content_payload.append(img)
+        except Exception as img_err:
+            print(f"[GEMINI] Pillow failed to open image ({img_err}), falling back to raw bytes...")
+            ext = Path(file_path).suffix.lower()
+            mime_map = {".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png"}
+            mime_type = mime_map.get(ext, "image/jpeg")
+            with open(file_path, "rb") as f:
+                image_bytes = f.read()
+            content_payload.append({"mime_type": mime_type, "data": image_bytes})
         
     elif file_type == "pdf":
-        # For PDF: use Gemini's PDF support
+        print(f"[GEMINI] Loading PDF bytes from '{file_path}'...")
         with open(file_path, "rb") as f:
-            pdf_data = f.read()
+            pdf_bytes = f.read()
         
         pdf_part = {
             "mime_type": "application/pdf",
-            "data": base64.standard_b64encode(pdf_data).decode("utf-8")
+            "data": pdf_bytes
         }
-        
-        response = model.generate_content([EXTRACTION_PROMPT, pdf_part])
-    
+        content_payload.append(pdf_part)
     else:
         raise ValueError(f"Unsupported file type: {file_type}")
     
+    print("[GEMINI] Initiating Gemini API call (gemini-1.5-flash)...")
+    try:
+        response = await asyncio.to_thread(model.generate_content, content_payload)
+        print("[GEMINI] Received response from Gemini API")
+    except Exception as api_err:
+        print(f"[GEMINI] Error during model.generate_content call: {api_err}")
+        traceback.print_exc()
+        raise api_err
+
     # Parse response
-    raw_text = response.text.strip()
+    try:
+        raw_text = response.text.strip()
+    except Exception as text_err:
+        print(f"[GEMINI] Error retrieving response.text: {text_err}")
+        print(f"[GEMINI] Candidate metadata: {getattr(response, 'candidates', None)}")
+        print(f"[GEMINI] Prompt feedback: {getattr(response, 'prompt_feedback', None)}")
+        traceback.print_exc()
+        raise text_err
+
+    print(f"[GEMINI] Raw Gemini response text:\n---\n{raw_text}\n---")
     
-    # Clean up if Gemini returns markdown code blocks
-    if raw_text.startswith("```"):
-        raw_text = raw_text.split("```")[1]
-        if raw_text.startswith("json"):
-            raw_text = raw_text[4:]
-    raw_text = raw_text.strip()
+    # Robust JSON substring extraction
+    start_idx = raw_text.find('{')
+    end_idx = raw_text.rfind('}')
+    if start_idx != -1 and end_idx != -1:
+        json_str = raw_text[start_idx:end_idx+1]
+        result = json.loads(json_str)
+    else:
+        cleaned = raw_text
+        if cleaned.startswith("```"):
+            cleaned = cleaned.split("```")[1]
+            if cleaned.startswith("json"):
+                cleaned = cleaned[4:]
+        cleaned = cleaned.strip()
+        result = json.loads(cleaned)
+
+    # Normalize if model omitted outer "fields" wrapper
+    if isinstance(result, dict) and "fields" not in result:
+        field_keys = ["date", "shift", "employee_number", "operation_code", "machine_number", "work_order_number", "quantity_produced", "time_taken"]
+        if any(k in result for k in field_keys):
+            result = {
+                "fields": {k: result.get(k) for k in field_keys},
+                "confidence_scores": result.get("confidence_scores", {k: 0.8 for k in field_keys}),
+                "overall_confidence": result.get("overall_confidence", 0.8),
+                "extraction_notes": result.get("extraction_notes", "")
+            }
     
-    result = json.loads(raw_text)
     result["raw_response"] = response.text
+    print(f"[GEMINI] Successfully parsed Gemini result: {json.dumps(result, indent=2)}")
     return result
 
 async def extract_with_nvidia(file_path: str, file_type: str) -> dict:
+    nvidia_key = os.getenv("NVIDIA_API_KEY")
+    print(f"[NVIDIA] Starting NVIDIA extraction for '{file_path}' (type: '{file_type}')")
+    print(f"[NVIDIA] NVIDIA_API_KEY configured: {bool(nvidia_key)}")
+    if not nvidia_key:
+        raise ValueError("NVIDIA_API_KEY environment variable is not set or empty!")
+
     if file_type == "pdf":
         raise ValueError("NVIDIA Vision API currently supports images, not PDFs. Please upload an image.")
         
     ext = Path(file_path).suffix.lower()
-    mime_map = {".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png"}
+    mime_map = {
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".png": "image/png",
+        ".webp": "image/webp"
+    }
     mime_type = mime_map.get(ext, "image/jpeg")
     
     base64_image = encode_image_to_base64(file_path)
     
     invoke_url = "https://integrate.api.nvidia.com/v1/chat/completions"
     headers = {
-        "Authorization": f"Bearer {os.getenv('NVIDIA_API_KEY')}",
+        "Authorization": f"Bearer {nvidia_key}",
         "Accept": "application/json"
     }
     
@@ -142,74 +195,156 @@ async def extract_with_nvidia(file_path: str, file_type: str) -> dict:
                 ]
             }
         ],
-        "max_tokens": 1024,
+        "max_tokens": 2048,
         "temperature": 0.1,
         "top_p": 1.00,
         "stream": False
     }
     
-    response = await asyncio.to_thread(requests.post, invoke_url, headers=headers, json=payload)
-    response.raise_for_status()
+    print("[NVIDIA] Initiating NVIDIA API call (meta/llama-3.2-90b-vision-instruct)...")
+    try:
+        response = await asyncio.to_thread(requests.post, invoke_url, headers=headers, json=payload)
+        response.raise_for_status()
+    except Exception as api_err:
+        print(f"[NVIDIA] Error during NVIDIA API call: {api_err}")
+        traceback.print_exc()
+        raise api_err
     
     response_json = response.json()
     raw_text = response_json["choices"][0]["message"]["content"].strip()
+    print(f"[NVIDIA] Raw NVIDIA response text:\n---\n{raw_text}\n---")
     
     # Parse response robustly by finding the first { and last }
-    raw_text = response_json["choices"][0]["message"]["content"].strip()
-    
     try:
         start_idx = raw_text.find('{')
         end_idx = raw_text.rfind('}')
         if start_idx != -1 and end_idx != -1:
             json_str = raw_text[start_idx:end_idx+1]
             result = json.loads(json_str)
+            # Normalize if model omitted outer "fields" wrapper
+            if isinstance(result, dict) and "fields" not in result:
+                field_keys = ["date", "shift", "employee_number", "operation_code", "machine_number", "work_order_number", "quantity_produced", "time_taken"]
+                if any(k in result for k in field_keys):
+                    result = {
+                        "fields": {k: result.get(k) for k in field_keys},
+                        "confidence_scores": result.get("confidence_scores", {k: 0.8 for k in field_keys}),
+                        "overall_confidence": result.get("overall_confidence", 0.8),
+                        "extraction_notes": result.get("extraction_notes", "")
+                    }
             result["raw_response"] = raw_text
+            print(f"[NVIDIA] Successfully parsed NVIDIA result: {json.dumps(result, indent=2)}")
             return result
         else:
             raise ValueError("No JSON object found in response")
     except Exception as e:
+        print(f"[NVIDIA] Failed to parse JSON from NVIDIA response: {e}")
+        traceback.print_exc()
         # Re-raise as JSONDecodeError for the outer try-except block to catch
         raise json.JSONDecodeError(f"Failed to parse: {str(e)}", raw_text, 0)
 
-async def extract_from_document(file_path: str, file_type: str) -> dict:
-    try:
-        provider = os.getenv("AI_PROVIDER", "gemini").lower()
+
+async def run_single_provider(provider_name: str, file_path: str, file_type: str) -> dict:
+    """Call a single provider after verifying API key and requirements."""
+    if provider_name == "gemini":
+        gemini_key = (os.getenv("GEMINI_API_KEY") or "").strip()
+        if not gemini_key:
+            raise ValueError("GEMINI_API_KEY is not set or empty")
+        return await extract_with_gemini(file_path, file_type)
         
-        if provider == "nvidia":
-            return await extract_with_nvidia(file_path, file_type)
+    elif provider_name == "nvidia":
+        nvidia_key = (os.getenv("NVIDIA_API_KEY") or "").strip()
+        if not nvidia_key:
+            raise ValueError("NVIDIA_API_KEY is not set or empty")
+        if file_type == "pdf":
+            raise ValueError("NVIDIA Vision API does not support PDFs (images only)")
+        return await extract_with_nvidia(file_path, file_type)
+        
+    else:
+        raise ValueError(f"Unknown AI provider: {provider_name}")
+
+def is_valid_extraction_result(result: dict) -> bool:
+    """Check if extraction result is non-empty and has at least one non-null extracted field."""
+    if not isinstance(result, dict):
+        return False
+    fields = result.get("fields")
+    if not isinstance(fields, dict) or not fields:
+        return False
+    # Check if there is at least one non-null, non-empty extracted value
+    has_any_value = any(v is not None and str(v).strip() != "" for v in fields.values())
+    return has_any_value
+
+async def extract_from_document(file_path: str, file_type: str) -> dict:
+    env_provider = os.getenv("AI_PROVIDER", "gemini").lower().strip()
+    
+    if env_provider == "nvidia":
+        primary = "nvidia"
+        secondary = "gemini"
+    else:
+        primary = "gemini"
+        secondary = "nvidia"
+
+    print(f"\n==================================================")
+    print(f"[EXTRACTION] Starting document extraction pipeline")
+    print(f"[EXTRACTION] file_path: '{file_path}' (exists on disk: {os.path.exists(file_path)})")
+    print(f"[EXTRACTION] file_type: '{file_type}'")
+    print(f"[EXTRACTION] AI_PROVIDER configured: '{env_provider}'")
+    print(f"[EXTRACTION] Execution plan: Primary={primary}, Fallback={secondary}")
+    print(f"==================================================")
+
+    # 1. Try Primary Provider
+    primary_reason = ""
+    print(f"Trying primary provider: {primary}")
+    try:
+        result = await run_single_provider(primary, file_path, file_type)
+        if is_valid_extraction_result(result):
+            result["provider_used"] = primary
+            print(f"Primary provider: {primary} succeeded")
+            print(f"[EXTRACTION] Final parsed result before returning:\n{json.dumps(result, indent=2)}")
+            return result
         else:
-            return await extract_with_gemini(file_path, file_type)
-            
-    except json.JSONDecodeError as e:
-        # Returned something unparseable
-        return {
-            "fields": {k: None for k in [
-                "date", "shift", "employee_number", "operation_code",
-                "machine_number", "work_order_number", 
-                "quantity_produced", "time_taken"
-            ]},
-            "confidence_scores": {k: 0.0 for k in [
-                "date", "shift", "employee_number", "operation_code",
-                "machine_number", "work_order_number",
-                "quantity_produced", "time_taken"
-            ]},
-            "overall_confidence": 0.0,
-            "extraction_notes": f"JSON parse error: {str(e)}",
-            "raw_response": getattr(e, 'doc', 'Unknown error - Check backend logs')
-        }
+            primary_reason = "All extracted fields are None or empty"
+            print(f"Primary provider failed: {primary_reason}. Trying fallback...")
     except Exception as e:
-        return {
-            "fields": {k: None for k in [
-                "date", "shift", "employee_number", "operation_code",
-                "machine_number", "work_order_number",
-                "quantity_produced", "time_taken"
-            ]},
-            "confidence_scores": {k: 0.0 for k in [
-                "date", "shift", "employee_number", "operation_code",
-                "machine_number", "work_order_number",
-                "quantity_produced", "time_taken"
-            ]},
-            "overall_confidence": 0.0,
-            "extraction_notes": f"Extraction failed: {str(e)}",
-            "raw_response": str(e)
-        }
+        primary_reason = str(e)
+        print(f"Primary provider failed: {primary_reason}. Trying fallback...")
+        traceback.print_exc()
+
+    # 2. Try Fallback Provider
+    secondary_reason = ""
+    print(f"Trying fallback provider: {secondary}")
+    try:
+        result = await run_single_provider(secondary, file_path, file_type)
+        if is_valid_extraction_result(result):
+            result["provider_used"] = secondary
+            print(f"Fallback provider: {secondary} succeeded")
+            print(f"[EXTRACTION] Final parsed result before returning:\n{json.dumps(result, indent=2)}")
+            return result
+        else:
+            secondary_reason = "All extracted fields are None or empty"
+            print(f"Fallback provider failed: {secondary_reason}")
+    except Exception as e:
+        secondary_reason = str(e)
+        print(f"Fallback provider failed: {secondary_reason}")
+        traceback.print_exc()
+
+    # 3. Both Providers Failed
+    print("Both providers failed")
+    error_summary = f"Both providers failed. Primary ({primary}): {primary_reason}. Fallback ({secondary}): {secondary_reason}"
+    return {
+        "fields": {k: None for k in [
+            "date", "shift", "employee_number", "operation_code",
+            "machine_number", "work_order_number", 
+            "quantity_produced", "time_taken"
+        ]},
+        "confidence_scores": {k: 0.0 for k in [
+            "date", "shift", "employee_number", "operation_code",
+            "machine_number", "work_order_number",
+            "quantity_produced", "time_taken"
+        ]},
+        "overall_confidence": 0.0,
+        "extraction_notes": error_summary,
+        "raw_response": error_summary,
+        "provider_used": None
+    }
+
+

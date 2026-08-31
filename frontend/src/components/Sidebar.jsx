@@ -1,6 +1,7 @@
 import React from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import { Upload, Clock, BarChart2 } from "lucide-react";
+import SystemHealthWidget from "./SystemHealthWidget";
 
 const links = [
   { to: "/upload", label: "Upload Document", icon: <Upload size={20} /> },
@@ -51,7 +52,11 @@ export default function Sidebar() {
         })}
       </nav>
       
-      <div className="text-white/20 text-[11px] mt-auto">AI Document Engine</div>
+      <div className="mt-auto pt-3 border-t border-white/10">
+        <SystemHealthWidget />
+        <div className="text-white/20 text-[10px] text-center mt-2">AI Document Engine</div>
+      </div>
     </aside>
   );
 }
+
