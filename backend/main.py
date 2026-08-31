@@ -5,6 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
+from sqlalchemy import text
 from database import Base, engine
 from routers import uploads, records, analytics
 
@@ -37,4 +38,11 @@ def on_startup():
     target_upload_dir = os.getenv("UPLOAD_DIR", "uploads")
     os.makedirs(target_upload_dir, exist_ok=True)
     Base.metadata.create_all(bind=engine)
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("ALTER TABLE extracted_records ADD COLUMN provider_used VARCHAR"))
+            conn.commit()
+    except Exception:
+        pass  # column already exists
+
 
