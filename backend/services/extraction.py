@@ -74,7 +74,7 @@ async def extract_with_gemini(file_path: str, file_type: str) -> dict:
 
     import google.generativeai as genai
     genai.configure(api_key=gemini_key)
-    model = genai.GenerativeModel("gemini-1.5-flash")
+    model = genai.GenerativeModel("gemini-2.5-flash-lite")
     
     content_payload = [EXTRACTION_PROMPT]
 
@@ -106,7 +106,8 @@ async def extract_with_gemini(file_path: str, file_type: str) -> dict:
     else:
         raise ValueError(f"Unsupported file type: {file_type}")
     
-    print("[GEMINI] Initiating Gemini API call (gemini-1.5-flash)...")
+    print("[GEMINI] Initiating Gemini API call (gemini-2.5-flash-lite)...")
+
     try:
         response = await asyncio.to_thread(model.generate_content, content_payload)
         print("[GEMINI] Received response from Gemini API")

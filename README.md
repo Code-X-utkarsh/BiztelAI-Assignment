@@ -17,7 +17,7 @@ BiztelAI DocFlow is an AI-powered manufacturing document digitization system. It
 ## Tech Stack
 - **Backend**: FastAPI, Python 3.11+, SQLAlchemy, SQLite
 - **Frontend**: React, Vite, Tailwind CSS, Recharts, React Router
-- **AI Integration**: Google Gemini 1.5 Flash
+- **AI Integration**: Google Gemini 2.5 Flash Lite
 
 ## Architecture Overview
 - **Upload Flow**: A document is uploaded via the frontend and saved to the backend `/uploads` directory. An `UploadRecord` is created, and an asynchronous background task is triggered.
@@ -68,7 +68,7 @@ npm run dev
 - **Local File Storage**: Uploaded files are saved to the local disk. In a production environment, this should be migrated to an S3-compatible object storage service.
 
 ## AI Providers (Gemini vs NVIDIA)
-BiztelAI DocFlow supports dual AI extraction providers. You can toggle between Google Gemini 1.5 Flash and NVIDIA Llama 3.2 90B Vision by changing the `AI_PROVIDER` environment variable.
+BiztelAI DocFlow supports dual AI extraction providers. You can toggle between Google Gemini 2.5 Flash Lite and NVIDIA Llama 3.2 90B Vision by changing the `AI_PROVIDER` environment variable.
 - Set `AI_PROVIDER=gemini` and provide `GEMINI_API_KEY`.
 - Set `AI_PROVIDER=nvidia` and provide `NVIDIA_API_KEY`.
 

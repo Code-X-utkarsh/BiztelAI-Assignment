@@ -1,7 +1,7 @@
 # AI Engineering Workflow — BiztelAI DocFlow
 
 ## AI Tools Used
-- Google Gemini 1.5 Flash (for OCR and data extraction)
+- Google Gemini 2.5 Flash Lite (for OCR and data extraction)
 - NVIDIA Llama 3.2 90B Vision (secondary extraction provider)
 - AI Coding Agent (for autonomous coding and execution)
 
